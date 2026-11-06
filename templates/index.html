@@ -1,0 +1,360 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Format Adjustment Tool</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body { margin: 0; padding: 0; }
+    </style>
+</head>
+<body class="bg-gray-900 text-white font-sans antialiased relative">
+
+    <!-- Forstørrelses-modal (skjult som standard) -->
+    <div id="lightbox" class="fixed inset-0 z-50 bg-black/95 hidden flex items-center justify-center cursor-pointer" onclick="closeLightbox()">
+        <img id="lightbox-img" src="" class="max-w-full max-h-full object-contain p-4">
+        <span class="absolute top-4 right-8 text-white text-3xl font-bold hover:text-gray-400">&times;</span>
+    </div>
+
+    <!-- Toppanel strammet helt op uden lodret padding, så logoet rammer kanten -->
+    <div class="w-full bg-gray-950 border-b border-gray-800 px-6 h-16 flex items-center mb-8">
+        <div class="max-w-6xl mx-auto w-full flex justify-between items-center">
+            <div class="flex items-center space-x-3">
+                <img src="/static/OC_Tag_04.png" alt="Logo" class="h-full max-h-12 object-contain" onerror="this.style.display='none'">
+                <h1 class="text-2xl font-bold">Format Adjustment Tool</h1>
+            </div>
+            
+            <select id="lang-select" onchange="changeLanguage(this.value)" class="bg-gray-800 text-white border border-gray-600 rounded p-2 focus:outline-none">
+                <option value="English">🇬🇧 English</option>
+                <option value="Dansk">🇩🇰 Dansk</option>
+            </select>
+        </div>
+    </div>
+
+    <div class="max-w-6xl mx-auto px-4 pb-12">
+        <h2 data-i18n="step1" class="text-xl font-semibold mb-4">Step 1: Upload & Target Formats</h2>
+        
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            <!-- Upload Sektion -->
+            <div class="col-span-2">
+                <div id="dropzone" class="border-2 border-dashed border-gray-600 rounded-lg p-10 text-center bg-gray-800 hover:bg-gray-700 transition cursor-pointer" onclick="document.getElementById('file-upload').click()">
+                    <p data-i18n="drop_text" class="text-gray-400 mb-2">Drag and drop slides here or click to browse</p>
+                    <p data-i18n="supports" class="text-sm text-gray-500">Supports .png, .jpg, .pptx, .key</p>
+                    <input id="file-upload" type="file" multiple accept=".png, .jpg, .jpeg, .pptx, .key" class="hidden" onchange="handleFiles(this.files)">
+                </div>
+
+                <div id="preview-container" class="mt-6 hidden">
+                    <div class="flex justify-between items-end mb-3">
+                        <h3 data-i18n="selected_slides" class="text-lg font-medium">Selected Slides:</h3>
+                        
+                        <div class="flex items-center space-x-3">
+                            <!-- Sorterings-dropdown -->
+                            <div class="flex items-center space-x-2">
+                                <span data-i18n="sort_label" class="text-sm text-gray-400">Sort:</span>
+                                <select id="sort-select" onchange="sortFiles()" class="bg-gray-800 text-white text-sm border border-gray-600 rounded p-1 focus:outline-none">
+                                    <option value="name" data-i18n="sort_name">Name (A-Z)</option>
+                                    <option value="added" data-i18n="sort_added">Order added</option>
+                                    <option value="date" data-i18n="sort_date">Date modified</option>
+                                    <option value="manual" data-i18n="sort_manual" disabled>Manual (Drag & Drop)</option>
+                                </select>
+                                <button id="sort-order-btn" onclick="toggleSortOrder()" title="Skift rækkefølge (Stigende/Faldende)" class="bg-gray-800 hover:bg-gray-700 border border-gray-600 text-white text-sm px-2 py-1 rounded transition">
+                                    ⬆️
+                                </button>
+                            </div>
+                            <!-- Ryd alle knap -->
+                            <button onclick="clearAllFiles()" data-i18n="clear_all" class="text-sm bg-red-900/50 hover:bg-red-800 text-red-200 py-1 px-3 rounded transition">🗑️ Clear all</button>
+                        </div>
+                    </div>
+                    
+                    <div id="preview-grid" class="grid grid-cols-3 gap-4"></div>
+                </div>
+            </div>
+
+            <!-- Indstillinger Sektion -->
+            <div class="bg-gray-800 p-6 rounded-lg border border-gray-700 h-fit">
+                <h3 data-i18n="target_screens" class="font-medium mb-3 border-b border-gray-700 pb-2">Target Screens</h3>
+                
+                <label class="flex items-center space-x-2 mb-2 cursor-pointer">
+                    <input type="checkbox" checked class="form-checkbox text-blue-500 rounded bg-gray-700 border-gray-600">
+                    <span data-i18n="center_screen">Center Screen (1536x576)</span>
+                </label>
+                
+                <label class="flex items-center space-x-2 mb-2 cursor-pointer">
+                    <input type="checkbox" class="form-checkbox text-blue-500 rounded bg-gray-700 border-gray-600">
+                    <span data-i18n="side_screens">Side Screens (1920x1080)</span>
+                </label>
+                
+                <label class="flex items-center space-x-2 mb-2 cursor-pointer">
+                    <input type="checkbox" class="form-checkbox text-blue-500 rounded bg-gray-700 border-gray-600">
+                    <span data-i18n="lower_thirds">Lower Thirds (Transparent)</span>
+                </label>
+                
+                <label class="flex items-center space-x-2 mb-2 cursor-pointer">
+                    <input type="checkbox" onchange="document.getElementById('custom-res-box').classList.toggle('hidden')" class="form-checkbox text-blue-500 rounded bg-gray-700 border-gray-600">
+                    <span data-i18n="custom_res">Custom Resolution</span>
+                </label>
+                
+                <div id="custom-res-box" class="hidden flex items-center space-x-2 mb-4 ml-6">
+                    <input type="number" placeholder="Width" class="w-20 bg-gray-900 border border-gray-600 rounded p-1 text-white text-sm focus:outline-none focus:border-blue-500">
+                    <span class="text-gray-400">x</span>
+                    <input type="number" placeholder="Height" class="w-20 bg-gray-900 border border-gray-600 rounded p-1 text-white text-sm focus:outline-none focus:border-blue-500">
+                    <span class="text-gray-400">px</span>
+                </div>
+
+                <h3 data-i18n="translation" class="font-medium mb-3 border-b border-gray-700 pb-2 mt-6">Translation</h3>
+                
+                <label class="flex items-center space-x-2 mb-2 cursor-pointer">
+                    <input type="checkbox" onchange="document.getElementById('target-lang').disabled = !this.checked" class="form-checkbox text-blue-500 rounded bg-gray-700 border-gray-600">
+                    <span data-i18n="enable_trans">Enable Translation</span>
+                </label>
+                
+                <select id="target-lang" disabled class="w-full bg-gray-900 text-white border border-gray-600 rounded p-2 mt-1 disabled:opacity-50 focus:outline-none">
+                    <option>🇬🇧 English (UK)</option>
+                    <option>🇩🇰 Dansk</option>
+                    <option>🇺🇦 Ukrainian (Українська)</option>
+                    <option>🇮🇷 Farsi (فارسی)</option>
+                    <option disabled>──────────</option>
+                    <option>🇩🇪 German</option>
+                    <option>🇪🇸 Spanish</option>
+                    <option>🇫🇷 French</option>
+                </select>
+
+                <button id="btn-analyze" onclick="analyzeImages()" class="w-full mt-8 bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 px-4 rounded transition">
+                    <span data-i18n="btn_analyze">🧠 Analyze Image & Continue ➡️</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const uiText = {
+            "English": {
+                "step1": "Step 1: Upload & Target Formats",
+                "drop_text": "Drag and drop slides here or click to browse",
+                "supports": "Supports .png, .jpg, .pptx, .key",
+                "selected_slides": "Selected Slides:",
+                "sort_label": "Sort:",
+                "sort_name": "Name (A-Z)",
+                "sort_added": "Order added",
+                "sort_date": "Date modified",
+                "sort_manual": "Manual (Drag & Drop)",
+                "clear_all": "🗑️ Clear all",
+                "target_screens": "Target Screens",
+                "center_screen": "Center Screen (1536x576)",
+                "side_screens": "Side Screens (1920x1080)",
+                "lower_thirds": "Lower Thirds (Transparent)",
+                "custom_res": "Custom Resolution",
+                "translation": "Translation",
+                "enable_trans": "Enable Translation",
+                "btn_analyze": "🧠 Analyze Image & Continue ➡️"
+            },
+            "Dansk": {
+                "step1": "Trin 1: Upload & Målformater",
+                "drop_text": "Træk slides hertil eller klik for at gennemse",
+                "supports": "Understøtter .png, .jpg, .pptx, .key",
+                "selected_slides": "Valgte Slides:",
+                "sort_label": "Sortér:",
+                "sort_name": "Navn (A-Å)",
+                "sort_added": "Rækkefølge tilføjet",
+                "sort_date": "Ændringsdato",
+                "sort_manual": "Manuel (Træk & Slip)",
+                "clear_all": "🗑️ Ryd alle",
+                "target_screens": "Målskærme",
+                "center_screen": "Centerskærm (1536x576)",
+                "side_screens": "Sideskærme (1920x1080)",
+                "lower_thirds": "Lower Thirds (Transparent)",
+                "custom_res": "Brugerdefineret opløsning",
+                "translation": "Oversættelse",
+                "enable_trans": "Aktivér Oversættelse",
+                "btn_analyze": "🧠 Analysér Billede & Fortsæt ➡️"
+            }
+        };
+
+        function changeLanguage(lang) {
+            document.querySelectorAll('[data-i18n]').forEach(element => {
+                const key = element.getAttribute('data-i18n');
+                if (uiText[lang] && uiText[lang][key]) {
+                    element.innerHTML = uiText[lang][key];
+                }
+            });
+        }
+
+        window.addEventListener('DOMContentLoaded', () => {
+            const initialLang = document.getElementById('lang-select').value;
+            changeLanguage(initialLang);
+        });
+
+        function openLightbox(imgSrc) {
+            const lightbox = document.getElementById('lightbox');
+            const lightboxImg = document.getElementById('lightbox-img');
+            lightboxImg.src = imgSrc;
+            lightbox.classList.remove('hidden');
+        }
+
+        function closeLightbox() {
+            document.getElementById('lightbox').classList.add('hidden');
+        }
+
+        document.addEventListener('keydown', function(event) {
+            if (event.key === "Escape") {
+                closeLightbox();
+            }
+        });
+
+        let activeFiles = [];
+        let fileCounter = 0;
+        let isAscending = true;
+        const previewGrid = document.getElementById('preview-grid');
+        const previewContainer = document.getElementById('preview-container');
+
+        function handleFiles(files) {
+            if (files.length === 0) return;
+            previewContainer.classList.remove('hidden');
+
+            Array.from(files).forEach(file => {
+                const isImage = file.type.startsWith('image/');
+                const url = isImage ? URL.createObjectURL(file) : null;
+                
+                activeFiles.push({
+                    id: fileCounter++,
+                    file: file,
+                    name: file.name,
+                    lastModified: file.lastModified,
+                    addedAt: Date.now(),
+                    isImage: isImage,
+                    url: url
+                });
+            });
+
+            if(document.getElementById('sort-select').value === 'manual') {
+                document.getElementById('sort-select').value = 'name';
+            }
+            sortFiles();
+        }
+
+        function toggleSortOrder() {
+            isAscending = !isAscending;
+            const btn = document.getElementById('sort-order-btn');
+            btn.innerHTML = isAscending ? "⬆️" : "⬇️";
+            sortFiles();
+        }
+
+        function sortFiles() {
+            const method = document.getElementById('sort-select').value;
+            
+            if (method === 'name') {
+                activeFiles.sort((a, b) => {
+                    let comp = a.name.localeCompare(b.name, undefined, {numeric: true, sensitivity: 'base'});
+                    return isAscending ? comp : -comp;
+                });
+            } else if (method === 'added') {
+                activeFiles.sort((a, b) => {
+                    let comp = a.addedAt - b.addedAt;
+                    return isAscending ? comp : -comp;
+                });
+            } else if (method === 'date') {
+                activeFiles.sort((a, b) => {
+                    let comp = b.lastModified - a.lastModified;
+                    return isAscending ? comp : -comp;
+                });
+            }
+            
+            renderGrid();
+        }
+
+        function removeFile(id) {
+            activeFiles = activeFiles.filter(f => f.id !== id);
+            if (activeFiles.length === 0) {
+                previewContainer.classList.add('hidden');
+            }
+            renderGrid();
+        }
+
+        function clearAllFiles() {
+            activeFiles = [];
+            previewContainer.classList.add('hidden');
+            renderGrid();
+        }
+
+        function renderGrid() {
+            previewGrid.innerHTML = '';
+            
+            activeFiles.forEach((fileObj, index) => {
+                const div = document.createElement('div');
+                div.className = "bg-gray-800 p-2 rounded border border-gray-600 flex flex-col cursor-move hover:border-gray-400 transition";
+                div.draggable = true;
+                div.dataset.index = index;
+                
+                div.addEventListener('dragstart', function(e) {
+                    draggedItemIndex = this.dataset.index;
+                    e.dataTransfer.effectAllowed = 'move';
+                    setTimeout(() => this.classList.add('opacity-50', 'border-blue-500'), 0);
+                });
+                
+                div.addEventListener('dragover', function(e) {
+                    e.preventDefault();
+                    e.dataTransfer.dropEffect = 'move';
+                    return false;
+                });
+                
+                div.addEventListener('drop', function(e) {
+                    e.stopPropagation();
+                    const droppedIndex = this.dataset.index;
+                    
+                    if (draggedItemIndex !== droppedIndex) {
+                        const itemToMove = activeFiles.splice(draggedItemIndex, 1)[0];
+                        activeFiles.splice(droppedIndex, 0, itemToMove);
+                        
+                        document.getElementById('sort-select').value = 'manual';
+                        renderGrid();
+                    }
+                    return false;
+                });
+                
+                div.addEventListener('dragend', function() {
+                    this.classList.remove('opacity-50', 'border-blue-500');
+                });
+
+                if (fileObj.isImage) {
+                    div.innerHTML = `
+                        <div class="w-full h-40 bg-gray-900 rounded mb-2 flex items-center justify-center overflow-hidden cursor-zoom-in" onclick="openLightbox('${fileObj.url}')">
+                            <img src="${fileObj.url}" class="max-w-full max-h-full object-contain pointer-events-none">
+                        </div>
+                        <span class="text-sm truncate" title="${fileObj.name}">${fileObj.name}</span>
+                        <button onclick="removeFile(${fileObj.id})" class="mt-2 text-xs bg-red-900/50 hover:bg-red-900 text-red-200 py-1 rounded transition w-full">🗑️ Fjern</button>
+                    `;
+                } else {
+                    const ext = fileObj.name.split('.').pop().toUpperCase();
+                    div.innerHTML = `
+                        <div class="w-full h-40 bg-gray-900 rounded mb-2 flex flex-col items-center justify-center overflow-hidden text-gray-500">
+                            <span class="text-4xl mb-2">📊</span>
+                            <span class="text-xs font-semibold">${ext} DOKUMENT</span>
+                        </div>
+                        <span class="text-sm truncate" title="${fileObj.name}">${fileObj.name}</span>
+                        <button onclick="removeFile(${fileObj.id})" class="mt-2 text-xs bg-red-900/50 hover:bg-red-900 text-red-200 py-1 rounded transition w-full">🗑️ Fjern</button>
+                    `;
+                }
+                previewGrid.appendChild(div);
+            });
+        }
+
+        const dropzone = document.getElementById('dropzone');
+        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+            dropzone.addEventListener(eventName, e => { e.preventDefault(); e.stopPropagation(); }, false);
+            document.body.addEventListener(eventName, e => { e.preventDefault(); e.stopPropagation(); }, false);
+        });
+
+        ['dragenter', 'dragover'].forEach(eventName => dropzone.addEventListener(eventName, () => dropzone.classList.add('border-blue-500', 'bg-gray-700'), false));
+        ['dragleave', 'drop'].forEach(eventName => dropzone.addEventListener(eventName, () => dropzone.classList.remove('border-blue-500', 'bg-gray-700'), false));
+
+        dropzone.addEventListener('drop', e => handleFiles(e.dataTransfer.files), false);
+        
+        function analyzeImages() {
+            const btn = document.getElementById('btn-analyze');
+            btn.innerHTML = "⏳ Arbejder... / Processing...";
+            setTimeout(() => { alert("Klar til Python-backend!"); btn.innerHTML = "🧠 Analyze Image & Continue ➡️"; }, 800);
+        }
+    </script>
+</body>
+</html>
